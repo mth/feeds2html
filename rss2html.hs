@@ -51,15 +51,16 @@ parseFeed =
 fetchFeed url =
     either (Left . show) parseFeed `fmap` tryIO (fetchCached url)
 
+runFetcher url = do
+    result <- newEmptyMVar
+    forkIO (fetchFeed url >>= tryPutMVar result >> return ())
+    return result
+
 fetchFeeds urls = do
-    let fetch url = do
-        result <- newEmptyMVar
-        forkIO (fetchFeed url >>= tryPutMVar result >> return ())
-        return result
-    threads <- mapM fetch urls
+    fetchers <- mapM runFetcher urls
     forkIO $ do threadDelay 10000000
-                mapM_ (`tryPutMVar` Left "timeout") threads
-    mapM readMVar threads
+                mapM_ (`tryPutMVar` Left "timeout") fetchers
+    mapM readMVar fetchers
 
 main = do
     args <- getArgs
