@@ -61,4 +61,4 @@ fetchFeeds urls = do
 
 main = do
     args <- getArgs
-    fetchCached (head args) >>= CL.putStrLn
+    fetchFeed (head args) >>= print
