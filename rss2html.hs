@@ -1,3 +1,4 @@
+import Control.Concurrent
 import Control.Exception as E
 import Data.Digest.Pure.SHA
 import qualified Data.ByteString.Char8 as C
@@ -43,6 +44,20 @@ fetchCached url = do
     tryIO $ createDirectory tmpdir 0o700
     let filename = tmpdir ++ '/' : (showDigest $ sha224 $ CL.pack url)
     fetchCachedImpl url filename
+
+parseFeed =
+    maybe (Left "feed parse error") Right . parseFeedString . CL.unpack
+
+fetchFeed url =
+    either (Left . show) parseFeed `fmap` tryIO (fetchCached url)
+
+fetchFeeds urls = do
+    -- not good, need to be able to determine when the chan is empty
+    -- and workers are finished
+    results <- newChan
+    let fetch url = forkIO (fetchFeed url >>= writeChan results)
+    threads <- mapM fetch urls
+    forkIO (threadDelay 10000000 >> mapM_ killThread threads)
 
 main = do
     args <- getArgs
