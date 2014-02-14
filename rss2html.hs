@@ -2,13 +2,15 @@ import Control.Exception as E
 import Data.Digest.Pure.SHA
 import qualified Data.ByteString.Char8 as C
 import qualified Data.ByteString.Lazy.Char8 as CL
+import qualified Network.HTTP as W
+import Network.HTTP.Date
+import Network.URI
 import System.Environment
 import System.Posix.Directory
 import System.Posix.Files
 import System.Posix.User
-import qualified Network.HTTP as W
-import Network.HTTP.Date
-import Network.URI
+import Text.Feed.Import
+import Text.Feed.Query
 
 tryIO :: IO a -> IO (Either E.IOException a)
 tryIO = E.try
