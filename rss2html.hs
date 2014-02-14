@@ -13,10 +13,10 @@ import Network.URI
 tryIO :: IO a -> IO (Either E.IOException a)
 tryIO = E.try
 
-httpGet :: String -> [W.Header] -> IO (W.Response C.ByteString)
+httpGet :: String -> [W.Header] -> IO (W.Response CL.ByteString)
 httpGet url headers = do
     uri <- maybe (fail $ "Bad URI: " ++ url) return (parseURI url)
-    let request = W.Request uri W.GET headers C.empty
+    let request = W.Request uri W.GET headers CL.empty
     W.simpleHTTP request >>= either (fail . show) return
 
 ifModified time =
@@ -30,9 +30,9 @@ fetchCachedImpl url filename = do
     print (W.rspCode result)
     case W.rspCode result of
         (2, 0, 0) -> do
-            C.writeFile filename (W.rspBody result)
+            CL.writeFile filename (W.rspBody result)
             return (W.rspBody result)
-        (3, 0, 4) -> C.readFile filename
+        (3, 0, 4) -> CL.readFile filename
         _ -> fail (W.rspReason result)
 
 fetchCached url = do
@@ -44,4 +44,4 @@ fetchCached url = do
 
 main = do
     args <- getArgs
-    fetchCached (head args) >>= C.putStrLn
+    fetchCached (head args) >>= CL.putStrLn
