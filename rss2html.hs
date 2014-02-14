@@ -52,13 +52,15 @@ fetchFeed url =
     either (Left . show) parseFeed `fmap` tryIO (fetchCached url)
 
 fetchFeeds urls = do
-    -- not good, need to be able to determine when the chan is empty
-    -- and workers are finished
-    results <- newChan
-    let fetch url = forkIO (fetchFeed url >>= writeChan results)
+    let fetch url = do
+        result <- newEmptyMVar
+        forkIO (fetchFeed url >>= tryPutMVar result >> return ())
+        return result
     threads <- mapM fetch urls
-    forkIO (threadDelay 10000000 >> mapM_ killThread threads)
+    forkIO $ do threadDelay 10000000
+                mapM_ (`tryPutMVar` Left "timeout") threads
+    mapM readMVar threads
 
 main = do
     args <- getArgs
-    fetchFeed (head args) >>= print
+    fetchFeeds args >>= mapM print
