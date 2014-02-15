@@ -3,40 +3,52 @@ import Control.Exception as E
 import Data.Digest.Pure.SHA
 import qualified Data.ByteString.Char8 as C
 import qualified Data.ByteString.Lazy.Char8 as CL
-import qualified Network.HTTP as W
 import Network.HTTP.Date
-import Network.URI
 import System.Environment
+import System.Exit
+import System.IO
 import System.Posix.Directory
 import System.Posix.Files
 import System.Posix.User
+import System.Process
 import Text.Feed.Import
 import Text.Feed.Query
 
 tryIO :: IO a -> IO (Either E.IOException a)
 tryIO = E.try
 
-httpGet :: String -> [W.Header] -> IO (W.Response CL.ByteString)
-httpGet url headers = do
-    uri <- maybe (fail $ "Bad URI: " ++ url) return (parseURI url)
-    let request = W.Request uri W.GET headers CL.empty
-    W.simpleHTTP request >>= either (fail . show) return
+wget :: String -> [String] -> IO (Either C.ByteString C.ByteString)
+wget url headers = do
+    let param = "-nv" : "-O" : "-" : "--no-check-certificate" :
+            "--timeout=10" : (map ("--header=" ++) headers ++ [url])
+        read h = do result <- newEmptyMVar
+                    forkIO (C.hGetContents h >>= putMVar result)
+                    return result
+    (inp, out, err, pid) <- runInteractiveProcess "wget" param Nothing Nothing
+    hClose inp
+    output <- read out
+    error  <- read err
+    exitCode <- waitForProcess pid
+    case exitCode of
+         ExitSuccess -> takeMVar output >>= return . Right
+         _ -> takeMVar error >>= return . Left
 
 ifModified time =
-    [W.Header W.HdrIfModifiedSince
+    ["If-Modified-Since: " ++
      (C.unpack $ formatHTTPDate $ epochTimeToHTTPDate time)]
 
 fetchCachedImpl url filename = do
     stat <- tryIO (getFileStatus filename)
     let headers = either (const []) (ifModified . modificationTime) stat
-    result <- httpGet url headers
-    print (W.rspCode result)
-    case W.rspCode result of
-        (2, 0, 0) -> do
-            CL.writeFile filename (W.rspBody result)
-            return (W.rspBody result)
-        (3, 0, 4) -> CL.readFile filename
-        _ -> fail (W.rspReason result)
+    result <- wget url headers
+    case result of
+        Left error ->
+            if C.pack " 304:" `C.isInfixOf` error
+                then C.readFile filename
+                else fail (C.unpack error)
+        Right content -> do
+            C.writeFile filename content
+            return content
 
 fetchCached url = do
     uid <- getRealUserID
@@ -46,7 +58,7 @@ fetchCached url = do
     fetchCachedImpl url filename
 
 parseFeed =
-    maybe (Left "feed parse error") Right . parseFeedString . CL.unpack
+    maybe (Left "feed parse error") Right . parseFeedString . C.unpack
 
 fetchFeed url =
     either (Left . show) parseFeed `fmap` tryIO (fetchCached url)
