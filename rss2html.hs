@@ -1,8 +1,9 @@
 import Control.Concurrent
 import Control.Exception as E
-import Data.Digest.Pure.SHA
+import Data.ByteString.UTF8 (toString)
 import qualified Data.ByteString.Char8 as C
 import qualified Data.ByteString.Lazy.Char8 as CL
+import Data.Digest.Pure.SHA
 import Network.HTTP.Date
 import System.Environment
 import System.Exit
@@ -58,7 +59,7 @@ fetchCached url = do
     fetchCachedImpl url filename
 
 parseFeed =
-    maybe (Left "feed parse error") Right . parseFeedString . C.unpack
+    maybe (Left "feed parse error") Right . parseFeedString . toString
 
 fetchFeed url =
     either (Left . show) parseFeed `fmap` tryIO (fetchCached url)
