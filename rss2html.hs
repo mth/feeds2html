@@ -18,17 +18,19 @@ import Text.Feed.Query
 tryIO :: IO a -> IO (Either E.IOException a)
 tryIO = E.try
 
+runFork action = do
+    result <- newEmptyMVar
+    forkIO (action >>= putMVar result)
+    return result
+
 wget :: String -> [String] -> IO (Either C.ByteString C.ByteString)
 wget url headers = do
     let param = "-nv" : "-O" : "-" : "--no-check-certificate" :
             "--timeout=10" : (map ("--header=" ++) headers ++ [url])
-        read h = do result <- newEmptyMVar
-                    forkIO (C.hGetContents h >>= putMVar result)
-                    return result
     (inp, out, err, pid) <- runInteractiveProcess "wget" param Nothing Nothing
     hClose inp
-    output <- read out
-    error  <- read err
+    output <- runFork (C.hGetContents out)
+    error  <- runFork (C.hGetContents err)
     exitCode <- waitForProcess pid
     case exitCode of
          ExitSuccess -> takeMVar output >>= return . Right
@@ -64,12 +66,8 @@ parseFeed =
 fetchFeed url =
     either (Left . show) parseFeed `fmap` tryIO (fetchCached url)
 
-fetchFeeds urls = do
-    let runFetcher url = do
-            result <- newEmptyMVar
-            forkIO (fetchFeed url >>= putMVar result)
-            return result
-    mapM runFetcher urls >>= mapM readMVar
+fetchFeeds urls =
+    mapM (runFork . fetchFeed) urls >>= mapM readMVar
 
 main = do
     args <- getArgs
