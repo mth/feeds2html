@@ -49,7 +49,7 @@ parseConfigItems str = skip parse 1 str
             Item html    -> cfg { items = html : items cfg }
             Page html    -> cfg { page  = html ++ page cfg }
 
-readConfig cfgfile = parse `fmap` C.readFile cfgfile
+readConfig = fmap parse . C.readFile
   where parse = parseConfigItems . C.unpack . C.unlines .
                 filter notComment . C.lines
         notComment s = let s' = C.dropWhile isSpace s in
