@@ -5,6 +5,7 @@ import qualified Data.ByteString.Char8 as C
 import qualified Data.ByteString.Lazy.Char8 as CL
 import Data.Char
 import Data.Digest.Pure.SHA
+import Data.Time.Format
 import Network.HTTP.Date
 import System.Environment
 import System.Exit
