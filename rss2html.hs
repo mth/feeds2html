@@ -6,7 +6,7 @@ import qualified Data.ByteString.Lazy.Char8 as CL
 import Data.Char
 import Data.Digest.Pure.SHA
 import Network.HTTP.Date
--- import System.Environment
+import System.Environment
 import System.Exit
 import System.IO
 import System.Posix (createDirectory, getRealUserID)
@@ -106,5 +106,6 @@ fetchFeeds urls =
     mapM (runFork . fetchFeed) urls >>= mapM readMVar
 
 main = do
-    cfg <- readConfig ".rss2htmlrc"
+    args <- getArgs
+    cfg <- readConfig (head args)
     fetchFeeds (map fst (feeds cfg)) >>= mapM print
