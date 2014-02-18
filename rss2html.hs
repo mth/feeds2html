@@ -33,7 +33,6 @@ data Config = Config { feeds :: [(String, [FeedOption])],
 
 data Entry = Entry { title    :: !C.ByteString,
                      link     :: !C.ByteString,
-                     comments :: !C.ByteString,
                      time     :: Maybe UTCTime,
                      descr    :: !C.ByteString,
                      score    :: !Double } deriving Show
@@ -73,7 +72,6 @@ dateFormats = map (maybe Nothing . parseTime defaultTimeLocale)
 getEntry item = Entry {
     title     = maybeStr (getItemTitle item),
     link      = maybeStr (getItemLink item),
-    comments  = maybeStr (getItemCommentLink item),
     time      = time,
     descr     = maybeStr (getItemDescription item),
     score     = maybe 0.0 score time
