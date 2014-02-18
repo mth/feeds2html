@@ -9,9 +9,8 @@ import Network.HTTP.Date
 -- import System.Environment
 import System.Exit
 import System.IO
-import System.Posix.Directory
+import System.Posix (createDirectory, getRealUserID)
 import System.Posix.Files
-import System.Posix.User
 import System.Process
 import Text.Feed.Import
 import Text.Feed.Query
