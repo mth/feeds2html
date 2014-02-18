@@ -1,15 +1,17 @@
 import Control.Concurrent
 import Control.Exception as E
-import Data.ByteString.UTF8 (toString)
+import Data.ByteString.UTF8 (fromString, toString)
 import qualified Data.ByteString.Char8 as C
 import qualified Data.ByteString.Lazy.Char8 as CL
 import Data.Char
 import Data.Digest.Pure.SHA
-import Data.Time.Format
+import Data.Maybe
+import Data.Time (UTCTime, utctDay, utctDayTime, parseTime)
 import Network.HTTP.Date
 import System.Environment
 import System.Exit
 import System.IO
+import System.Locale (defaultTimeLocale, iso8601DateFormat, rfc822DateFormat)
 import System.Posix (createDirectory, getRealUserID)
 import System.Posix.Files
 import System.Process
@@ -28,6 +30,13 @@ data ConfigItem =
 data Config = Config { feeds :: [(String, [FeedOption])],
                        items :: [[HtmlDef]],
                        page  :: [HtmlDef] }
+
+data Entry = Entry { title    :: !C.ByteString,
+                     link     :: !C.ByteString,
+                     comments :: !C.ByteString,
+                     time     :: Maybe UTCTime,
+                     descr    :: !C.ByteString,
+                     score    :: !Double } deriving Show
 
 tryIO :: IO a -> IO (Either E.IOException a)
 tryIO = E.try
@@ -54,6 +63,23 @@ readConfig = fmap parse . C.readFile
                 filter notComment . C.lines
         notComment s = let s' = C.dropWhile isSpace s in
                        C.null s' || C.head s' /= '#'
+
+maybeStr = maybe C.empty fromString
+
+dateFormats = map (maybe Nothing . parseTime defaultTimeLocale)
+    [ iso8601DateFormat (Just "%H:%M:%S%Z"),
+      iso8601DateFormat (Just "%H:%M:%S%Q%Z"), rfc822DateFormat ]
+
+getEntry item = Entry {
+    title     = maybeStr (getItemTitle item),
+    link      = maybeStr (getItemLink item),
+    comments  = maybeStr (getItemCommentLink item),
+    time      = time,
+    descr     = maybeStr (getItemDescription item),
+    score     = maybe 0.0 score time
+} where time = listToMaybe (mapMaybe ($ getItemDate item) dateFormats)
+        score t = fromIntegral (fromEnum (utctDay t)) * 1440 +
+                  fromRational (toRational (utctDayTime t) / 60)
 
 runFork action = do
     result <- newEmptyMVar
@@ -98,7 +124,8 @@ fetchCached url = do
     fetchCachedImpl url filename
 
 parseFeed =
-    maybe (Left "feed parse error") Right . parseFeedString . toString
+    maybe (Left "feed parse error")
+          (Right . map getEntry . feedItems) . parseFeedString . toString
 
 fetchFeed url =
     either (Left . show) parseFeed `fmap` tryIO (fetchCached url)
