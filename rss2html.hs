@@ -77,7 +77,7 @@ getEntry item = Entry {
     score     = maybe 0.0 score time
 } where time = listToMaybe (mapMaybe ($ getItemDate item) dateFormats)
         score t = fromIntegral (fromEnum (utctDay t)) * 1440 +
-                  fromRational (toRational (utctDayTime t) / 60)
+                  realToFrac (utctDayTime t) / 60
 
 runFork action = do
     result <- newEmptyMVar
