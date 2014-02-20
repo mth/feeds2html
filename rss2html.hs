@@ -66,8 +66,8 @@ readConfig = fmap parse . C.readFile
 maybeStr = maybe C.empty fromString
 
 dateFormats = map (maybe Nothing . parseTime defaultTimeLocale)
-    [ iso8601DateFormat (Just "%H:%M:%S%Z"),
-      iso8601DateFormat (Just "%H:%M:%S%Q%Z"), rfc822DateFormat ]
+    [ rfc822DateFormat, iso8601DateFormat (Just "%H:%M:%S%Z"),
+      iso8601DateFormat (Just "%H:%M:%S%Q%Z") ]
 
 getEntry item = Entry {
     title     = maybeStr (getItemTitle item),
