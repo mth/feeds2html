@@ -76,7 +76,7 @@ getEntry item = Entry {
     descr     = maybeStr (getItemDescription item),
     score     = maybe 0.0 score time
 } where time = listToMaybe (mapMaybe ($ getItemDate item) dateFormats)
-        score t = fromIntegral (fromEnum (utctDay t)) * 1440 +
+        score t = fromIntegral (fromEnum (utctDay t) - 50000) * 1440 +
                   realToFrac (utctDayTime t) / 60
 
 runFork action = do
