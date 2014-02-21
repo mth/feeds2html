@@ -21,6 +21,7 @@ import System.Process
 import Text.Feed.Import
 import Text.Feed.Query
 import Text.HTML.SanitizeXSS
+import Text.XML.Light
 
 data FeedOption = PreserveOrder | Adjust Double deriving (Read, Eq)
 data HtmlDef = H C.ByteString | Title deriving Read
@@ -67,7 +68,8 @@ readConfig = fmap parse . C.readFile
         notComment s = let s' = C.dropWhile isSpace s in
                        C.null s' || C.head s' /= '#'
 
-maybeStr = maybe C.empty fromString
+escapeXml str = showCData (CData CDataText str Nothing)
+maybeStr = maybe C.empty (fromString . escapeXml)
 
 dateFormats = map (maybe Nothing . parseTime defaultTimeLocale)
     [ rfc822DateFormat, iso8601DateFormat (Just "%H:%M:%S%Z"),
