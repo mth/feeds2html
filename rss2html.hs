@@ -125,8 +125,7 @@ fetchCached url = do
     let filename = tmpdir ++ '/' : (showDigest $ sha224 $ CL.pack url)
     fetchCachedImpl url filename
 
-adjustScores maxScore options entries =
-    foldr (.) orderf (map optf options) entries
+adjustScores maxScore options = foldr (.) orderf (map optf options)
   where order _ [] = []
         order best (item : newer) =
             let newer' = order (max best (score item)) newer in
