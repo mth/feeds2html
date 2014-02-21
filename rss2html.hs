@@ -9,6 +9,7 @@ import Data.Function
 import Data.List (sortBy)
 import Data.Maybe
 import Data.Time (UTCTime, utctDay, utctDayTime, parseTime, getCurrentTime)
+import qualified Data.Text as T
 import Network.HTTP.Date
 import System.Environment
 import System.Exit
@@ -19,6 +20,7 @@ import System.Posix.Files
 import System.Process
 import Text.Feed.Import
 import Text.Feed.Query
+import Text.HTML.SanitizeXSS
 
 data FeedOption = PreserveOrder | Adjust Double deriving (Read, Eq)
 data HtmlDef = H C.ByteString | Title deriving Read
@@ -36,7 +38,7 @@ data Config = Config { feeds :: [(String, [FeedOption])],
 data Entry = Entry { title    :: !C.ByteString,
                      link     :: !C.ByteString,
                      time     :: Maybe UTCTime,
-                     descr    :: !C.ByteString,
+                     descr    :: !T.Text,
                      score    :: !Double } deriving Show
 
 tryIO :: IO a -> IO (Either E.IOException a)
@@ -79,7 +81,8 @@ getEntry item = Entry {
     title     = maybeStr (getItemTitle item),
     link      = maybeStr (getItemLink item),
     time      = time,
-    descr     = maybeStr (getItemDescription item),
+    descr     = maybe T.empty (sanitizeBalance . T.pack)
+                      (getItemDescription item),
     score     = maybe 0.0 timeToScore time
 } where time = listToMaybe (mapMaybe ($ getItemDate item) dateFormats)
 
