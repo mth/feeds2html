@@ -94,11 +94,11 @@ wget url headers = do
             "--timeout=10" : (map ("--header=" ++) headers ++ [url])
     (inp, out, err, pid) <- runInteractiveProcess "wget" param Nothing Nothing
     hClose inp
-    output <- runFork (C.hGetContents out)
     error  <- runFork (C.hGetContents err)
+    output <- C.hGetContents out
     exitCode <- waitForProcess pid
     case exitCode of
-         ExitSuccess -> takeMVar output >>= return . Right
+         ExitSuccess -> return (Right output)
          _ -> takeMVar error >>= return . Left
 
 ifModified time =
