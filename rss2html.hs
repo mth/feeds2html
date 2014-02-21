@@ -141,10 +141,8 @@ adjustScores maxScore options entries =
         optf (Adjust by) = map (\e -> e { score = score e + by * 60 })
         optf PreserveOrder = id
 
-toEntries options feed = do
-    t <- getCurrentTime
-    return $ adjustScores (timeToScore t) options
-           $ map getEntry $ feedItems feed
+toEntries curtime options =
+    adjustScores (timeToScore curtime) options . map getEntry . feedItems
 
 parseFeed =
     maybe (Left "feed parse error") Right . parseFeedString . toString
@@ -152,8 +150,8 @@ parseFeed =
 fetchFeed (url, options) = do
     xml <- tryIO (fetchCached url)
     case either (Left . show) parseFeed xml of
-        Right feed -> do entries <- toEntries options feed
-                         return ([], entries)
+        Right feed -> do t <- getCurrentTime
+                         return ([], toEntries t options feed)
         Left error -> return ([error], [])
 
 fetchFeeds feeds = do
