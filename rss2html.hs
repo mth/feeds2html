@@ -134,7 +134,7 @@ adjustScores maxScore options entries =
                then item : newer'
                else let next_score = case newer' of
                                         h : _ -> score h
-                                        [] -> maxScore in
+                                        [] -> max best maxScore in
                     item { score = (best + next_score) / 2 } : newer'
         orderf = if elem PreserveOrder options
                      then reverse . order (-1e9) . reverse else id
