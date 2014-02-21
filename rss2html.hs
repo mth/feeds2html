@@ -5,8 +5,10 @@ import qualified Data.ByteString.Char8 as C
 import qualified Data.ByteString.Lazy.Char8 as CL
 import Data.Char
 import Data.Digest.Pure.SHA
+import Data.Function
+import Data.List (sortBy)
 import Data.Maybe
-import Data.Time (UTCTime, utctDay, utctDayTime, parseTime)
+import Data.Time (UTCTime, utctDay, utctDayTime, parseTime, getCurrentTime)
 import Network.HTTP.Date
 import System.Environment
 import System.Exit
@@ -18,7 +20,7 @@ import System.Process
 import Text.Feed.Import
 import Text.Feed.Query
 
-data FeedOption = PreserveOrder deriving Read
+data FeedOption = PreserveOrder | Adjust Double deriving (Read, Eq)
 data HtmlDef = H C.ByteString | Title deriving Read
 
 data ConfigItem =
@@ -69,15 +71,17 @@ dateFormats = map (maybe Nothing . parseTime defaultTimeLocale)
     [ rfc822DateFormat, iso8601DateFormat (Just "%H:%M:%S%Z"),
       iso8601DateFormat (Just "%H:%M:%S%Q%Z") ]
 
+timeToScore t =
+    fromIntegral (fromEnum (utctDay t) - 50000) * 1440 +
+    realToFrac (utctDayTime t) / 60
+
 getEntry item = Entry {
     title     = maybeStr (getItemTitle item),
     link      = maybeStr (getItemLink item),
     time      = time,
     descr     = maybeStr (getItemDescription item),
-    score     = maybe 0.0 score time
+    score     = maybe 0.0 timeToScore time
 } where time = listToMaybe (mapMaybe ($ getItemDate item) dateFormats)
-        score t = fromIntegral (fromEnum (utctDay t) - 50000) * 1440 +
-                  realToFrac (utctDayTime t) / 60
 
 runFork action = do
     result <- newEmptyMVar
@@ -121,17 +125,46 @@ fetchCached url = do
     let filename = tmpdir ++ '/' : (showDigest $ sha224 $ CL.pack url)
     fetchCachedImpl url filename
 
+adjustScores maxScore options entries =
+    foldr (.) orderf (map optf options) entries
+  where order _ [] = []
+        order best (item : newer) =
+            let newer' = order (max best (score item)) newer in
+            if score item > best
+               then item : newer'
+               else let next_score = case newer' of
+                                        h : _ -> score h
+                                        [] -> maxScore in
+                    item { score = (best + next_score) / 2 } : newer'
+        orderf = if elem PreserveOrder options
+                     then reverse . order (-1e9) . reverse else id
+        optf (Adjust by) = map (\e -> e { score = score e + by * 60 })
+        optf PreserveOrder = id
+
+toEntries options feed = do
+    t <- getCurrentTime
+    return $ adjustScores (timeToScore t) options
+           $ map getEntry $ feedItems feed
+
 parseFeed =
-    maybe (Left "feed parse error")
-          (Right . map getEntry . feedItems) . parseFeedString . toString
+    maybe (Left "feed parse error") Right . parseFeedString . toString
 
-fetchFeed url =
-    either (Left . show) parseFeed `fmap` tryIO (fetchCached url)
+fetchFeed (url, options) = do
+    xml <- tryIO (fetchCached url)
+    case either (Left . show) parseFeed xml of
+        Right feed -> do entries <- toEntries options feed
+                         return ([], entries)
+        Left error -> return ([error], [])
 
-fetchFeeds urls =
-    mapM (runFork . fetchFeed) urls >>= mapM readMVar
+fetchFeeds feeds = do
+    results <- mapM (runFork . fetchFeed) feeds >>= mapM readMVar
+    let entries = sortBy (on (flip compare) score)
+                         (concatMap snd results)
+    return (concatMap fst results, entries)
 
 main = do
     args <- getArgs
     cfg <- readConfig (head args)
-    fetchFeeds (map fst (feeds cfg)) >>= mapM print
+    (errors, entries) <- fetchFeeds (feeds cfg)
+    mapM print entries
+    mapM putStrLn errors
