@@ -1,5 +1,5 @@
 rss2html: rss2html.hs
-	ghc -o $@ -threaded -W -O2 -XBangPatterns -fspec-constr-count=5 \
+	ghc -o $@ -W -O2 -XBangPatterns -fspec-constr-count=5 \
 		--make $+
 	strip --strip-all $@
 
