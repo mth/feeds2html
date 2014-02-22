@@ -10,6 +10,7 @@ import Data.List (sortBy)
 import Data.Maybe
 import Data.Time (UTCTime, utctDay, utctDayTime, parseTime, getCurrentTime)
 import qualified Data.Text as T
+import Data.Text.Encoding
 import Network.HTTP.Date
 import System.Environment
 import System.Exit
@@ -36,10 +37,11 @@ data Config = Config { feeds :: [(String, [FeedOption])],
                        items :: [[HtmlDef]],
                        page  :: [HtmlDef] }
 
+-- all text fields are UTF-8 encoded
 data Entry = Entry { title    :: !C.ByteString,
                      link     :: !C.ByteString,
                      time     :: Maybe UTCTime,
-                     descr    :: !T.Text,
+                     summary  :: !C.ByteString,
                      score    :: !Double } deriving Show
 
 tryIO :: IO a -> IO (Either E.IOException a)
@@ -83,7 +85,7 @@ getEntry item = Entry {
     title     = maybeStr (getItemTitle item),
     link      = maybeStr (getItemLink item),
     time      = time,
-    descr     = maybe T.empty (sanitizeBalance . T.pack)
+    summary   = maybe C.empty (encodeUtf8 . sanitizeBalance . T.pack)
                       (getItemDescription item),
     score     = maybe 0.0 timeToScore time
 } where time = listToMaybe (mapMaybe ($ getItemDate item) dateFormats)
