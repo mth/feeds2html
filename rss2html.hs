@@ -25,17 +25,22 @@ import Text.HTML.SanitizeXSS
 import Text.XML.Light
 
 data FeedOption = PreserveOrder | Adjust Double deriving (Read, Eq)
-data HtmlDef = H C.ByteString | Title deriving Read
+data HtmlDef = H C.ByteString | Items |
+               Title | Link | Time C.ByteString | Summary
+    deriving Read
+
 
 data ConfigItem =
     Feed C.ByteString [FeedOption] |
     Item [HtmlDef] |
-    Page [HtmlDef]
+    Page [HtmlDef] |
+    MaxAge Double
     deriving Read
 
-data Config = Config { feeds :: [(String, [FeedOption])],
-                       items :: [[HtmlDef]],
-                       page  :: [HtmlDef] }
+data Config = Config { feeds  :: [(String, [FeedOption])],
+                       items  :: [[HtmlDef]],
+                       page   :: [HtmlDef],
+                       maxAge :: Double }
 
 -- all text fields are UTF-8 encoded
 data Entry = Entry { title    :: !C.ByteString,
@@ -50,7 +55,7 @@ tryIO = E.try
 parseConfigItems str = skip parse 1 str
   where skip _ line ('\n':s) = skip parse (line + 1) s
         skip tr line (c:s) | isSpace c = skip tr line s
-        skip _ _ "" = Config { feeds = [], items = [], page = [] }
+        skip _ _ "" = Config { feeds = [], items = [], page = [], maxAge = 300 }
         skip tr line str = tr line str
         parse line str = case reads str of
             ((result, tail):_) ->
@@ -60,9 +65,10 @@ parseConfigItems str = skip parse 1 str
             _ -> error (show line ++ ": syntax error")
         err line _ = error (show line ++ ": expected newline after definition")
         compose item cfg = case item of
-            Feed url opt -> cfg { feeds = (C.unpack url, opt) : feeds cfg }
-            Item html    -> cfg { items = html : items cfg }
-            Page html    -> cfg { page  = html ++ page cfg }
+            Feed url opt -> cfg { feeds  = (C.unpack url, opt) : feeds cfg }
+            Item html    -> cfg { items  = html : items cfg }
+            Page html    -> cfg { page   = html ++ page cfg }
+            MaxAge age   -> cfg { maxAge = age }
 
 readConfig = fmap parse . C.readFile
   where parse = parseConfigItems . C.unpack . C.unlines .
