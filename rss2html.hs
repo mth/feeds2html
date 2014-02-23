@@ -180,7 +180,7 @@ toHtml cfg items = htmlOf items (page cfg)
             Link -> map link
             Time format -> mapMaybe (fmap (timeStr format) . time)
             Summary -> map summary
-        timeStr f = fromString . formatTime defaultTimeLocale f
+        timeStr f = C.pack . formatTime defaultTimeLocale f
 
 main = do
     args <- getArgs
