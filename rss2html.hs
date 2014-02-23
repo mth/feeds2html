@@ -181,7 +181,7 @@ toHtml cfg (errors, items) = C.concat $ htmlOf items (page cfg)
             Time format -> mapMaybe (fmap (timeStr format) . time)
             Summary -> map summary
             Errors before after ->
-                let error e = [before, fromString (escapeXml e), after] in
+                let error e = [before, C.pack (escapeXml e), after] in
                 const (concatMap error errors)
         timeStr f = C.pack . formatTime defaultTimeLocale f
 
