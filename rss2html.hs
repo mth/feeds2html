@@ -172,7 +172,7 @@ fetchFeeds feeds = do
                          (concatMap snd results)
     return (concatMap fst results, entries)
 
-toHtml cfg (errors, items) = htmlOf items (page cfg)
+toHtml cfg (errors, items) = C.concat $ htmlOf items (page cfg)
   where htmlOf = concatMap . flip process
         process template = case template of
             H html -> const [html]
@@ -189,5 +189,4 @@ toHtml cfg (errors, items) = htmlOf items (page cfg)
 main = do
     args <- getArgs
     cfg <- readConfig (head args)
-    result <- fetchFeeds (feeds cfg)
-    CL.putStrLn $ CL.fromChunks $ toHtml cfg result
+    fetchFeeds (feeds cfg) >>= C.putStrLn . toHtml cfg
