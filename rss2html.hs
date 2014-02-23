@@ -26,7 +26,8 @@ import Text.HTML.SanitizeXSS
 import Text.XML.Light
 
 data FeedOption = PreserveOrder | Adjust Double deriving (Read, Eq)
-data HtmlDef = H C.ByteString | Items | Title | Link | Time String | Summary
+data HtmlDef = H C.ByteString | Items | Errors C.ByteString C.ByteString |
+               Title | Link | Time String | Summary
     deriving Read
 
 data ConfigItem =
@@ -171,7 +172,7 @@ fetchFeeds feeds = do
                          (concatMap snd results)
     return (concatMap fst results, entries)
 
-toHtml cfg items = htmlOf items (page cfg)
+toHtml cfg (errors, items) = htmlOf items (page cfg)
   where htmlOf = concatMap . flip process
         process template = case template of
             H html -> const [html]
@@ -180,11 +181,13 @@ toHtml cfg items = htmlOf items (page cfg)
             Link -> map link
             Time format -> mapMaybe (fmap (timeStr format) . time)
             Summary -> map summary
+            Errors before after ->
+                let error e = [before, fromString (escapeXml e), after] in
+                const (concatMap error errors)
         timeStr f = C.pack . formatTime defaultTimeLocale f
 
 main = do
     args <- getArgs
     cfg <- readConfig (head args)
-    (errors, entries) <- fetchFeeds (feeds cfg)
-    CL.putStrLn $ CL.fromChunks $ toHtml cfg entries
-    mapM putStrLn errors
+    result <- fetchFeeds (feeds cfg)
+    CL.putStrLn $ CL.fromChunks $ toHtml cfg result
