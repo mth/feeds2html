@@ -172,7 +172,7 @@ fetchFeeds feeds = do
     return (concatMap fst results, entries)
 
 toHtml cfg items = htmlOf items (page cfg)
-  where htmlOf items = concatMap (`process` items)
+  where htmlOf = concatMap . flip process
         process template = case template of
             H html -> const [html]
             Items -> concatMap ((`htmlOf` item cfg) . (:[]))
