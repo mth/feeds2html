@@ -8,7 +8,8 @@ import Data.Digest.Pure.SHA
 import Data.Function
 import Data.List (sortBy)
 import Data.Maybe
-import Data.Time (UTCTime, utctDay, utctDayTime, parseTime, getCurrentTime)
+import Data.Time (UTCTime, utctDay, utctDayTime,
+                  formatTime, parseTime, getCurrentTime)
 import qualified Data.Text as T
 import Data.Text.Encoding
 import Network.HTTP.Date
@@ -25,10 +26,8 @@ import Text.HTML.SanitizeXSS
 import Text.XML.Light
 
 data FeedOption = PreserveOrder | Adjust Double deriving (Read, Eq)
-data HtmlDef = H C.ByteString | Items |
-               Title | Link | Time C.ByteString | Summary
+data HtmlDef = H C.ByteString | Items | Title | Link | Time String | Summary
     deriving Read
-
 
 data ConfigItem =
     Feed C.ByteString [FeedOption] |
@@ -38,7 +37,7 @@ data ConfigItem =
     deriving Read
 
 data Config = Config { feeds  :: [(String, [FeedOption])],
-                       items  :: [[HtmlDef]],
+                       item   :: [HtmlDef],
                        page   :: [HtmlDef],
                        maxAge :: Double }
 
@@ -55,7 +54,7 @@ tryIO = E.try
 parseConfigItems str = skip parse 1 str
   where skip _ line ('\n':s) = skip parse (line + 1) s
         skip tr line (c:s) | isSpace c = skip tr line s
-        skip _ _ "" = Config { feeds = [], items = [], page = [], maxAge = 300 }
+        skip _ _ "" = Config { feeds = [], item = [], page = [], maxAge = 300 }
         skip tr line str = tr line str
         parse line str = case reads str of
             ((result, tail):_) ->
@@ -64,10 +63,10 @@ parseConfigItems str = skip parse 1 str
                 compose result (skip err nl tail)
             _ -> error (show line ++ ": syntax error")
         err line _ = error (show line ++ ": expected newline after definition")
-        compose item cfg = case item of
+        compose cfgitem cfg = case cfgitem of
             Feed url opt -> cfg { feeds  = (C.unpack url, opt) : feeds cfg }
-            Item html    -> cfg { items  = html : items cfg }
             Page html    -> cfg { page   = html ++ page cfg }
+            Item html    -> cfg { item   = html ++ item cfg }
             MaxAge age   -> cfg { maxAge = age }
 
 readConfig = fmap parse . C.readFile
@@ -172,9 +171,20 @@ fetchFeeds feeds = do
                          (concatMap snd results)
     return (concatMap fst results, entries)
 
+toHtml cfg items = htmlOf items (page cfg)
+  where htmlOf items = concatMap (`process` items)
+        process template = case template of
+            H html -> const [html]
+            Items -> concatMap ((`htmlOf` item cfg) . (:[]))
+            Title -> map title
+            Link -> map link
+            Time format -> mapMaybe (fmap (timeStr format) . time)
+            Summary -> map summary
+        timeStr f = fromString . formatTime defaultTimeLocale f
+
 main = do
     args <- getArgs
     cfg <- readConfig (head args)
     (errors, entries) <- fetchFeeds (feeds cfg)
-    mapM print entries
+    CL.putStrLn $ CL.fromChunks $ toHtml cfg entries
     mapM putStrLn errors
