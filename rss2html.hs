@@ -118,7 +118,7 @@ ifModified time =
     ["If-Modified-Since: " ++
      (C.unpack $ formatHTTPDate $ epochTimeToHTTPDate time)]
 
-fetchCachedImpl url filename = do
+fetchCached url filename = do
     stat <- tryIO (getFileStatus filename)
     let headers = either (const []) (ifModified . modificationTime) stat
     result <- wget url headers
@@ -131,12 +131,11 @@ fetchCachedImpl url filename = do
             C.writeFile filename content
             return content
 
-fetchCached url = do
+getCacheFile key = do
     uid <- getRealUserID
     let tmpdir = "/tmp/.rss-cache-" ++ show uid
     tryIO $ createDirectory tmpdir 0o700
-    let filename = tmpdir ++ '/' : (showDigest $ sha224 $ CL.pack url)
-    fetchCachedImpl url filename
+    return $ tmpdir ++ '/' : (showDigest $ sha224 $ CL.pack key)
 
 adjustScores maxScore options = foldr (.) orderf (map optf options)
   where order _ [] = []
@@ -160,7 +159,7 @@ parseFeed =
     maybe (Left "feed parse error") Right . parseFeedString . toString
 
 fetchFeed (url, options) = do
-    xml <- tryIO (fetchCached url)
+    xml <- tryIO (getCacheFile url >>= fetchCached url)
     case either (Left . show) parseFeed xml of
         Right feed -> do t <- getCurrentTime
                          return ([], toEntries t options feed)
