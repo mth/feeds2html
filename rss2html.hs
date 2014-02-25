@@ -37,13 +37,15 @@ data ConfigItem =
     Feed C.ByteString [FeedOption] |
     Item [HtmlDef] |
     Page [HtmlDef] |
-    MaxAge Int
+    MaxAge Int |
+    Limit Int
     deriving Read
 
 data Config = Config { feeds  :: [(String, [FeedOption])],
                        item   :: [HtmlDef],
                        page   :: [HtmlDef],
-                       maxAge :: Int }
+                       maxAge :: Int,
+                       limit  :: Maybe Int }
 
 -- all text fields are UTF-8 encoded
 data Entry = Entry { title    :: !C.ByteString,
@@ -58,7 +60,8 @@ tryIO = E.try
 parseConfigItems str = skip parse 1 str
   where skip _ line ('\n':s) = skip parse (line + 1) s
         skip tr line (c:s) | isSpace c = skip tr line s
-        skip _ _ "" = Config { feeds = [], item = [], page = [], maxAge = 300 }
+        skip _ _ "" = Config { feeds = [], item = [], page = [],
+                               maxAge = 300, limit = Nothing }
         skip tr line str = tr line str
         parse line str = case reads str of
             ((result, tail):_) ->
@@ -72,6 +75,7 @@ parseConfigItems str = skip parse 1 str
             Page html    -> cfg { page   = html ++ page cfg }
             Item html    -> cfg { item   = html ++ item cfg }
             MaxAge age   -> cfg { maxAge = age }
+            Limit limit  -> cfg { limit  = Just limit }
 
 readConfig = fmap parse . C.readFile
   where parse = parseConfigItems . C.unpack . C.unlines .
@@ -182,7 +186,7 @@ fetchFeeds feeds = do
                          (concatMap snd results)
     return (concatMap fst results, entries)
 
-toHtml cfg (errors, items) = C.concat $ htmlOf items (page cfg)
+toHtml cfg (errors, allItems) = C.concat $ htmlOf items (page cfg)
   where htmlOf = concatMap . flip process
         process template = case template of
             H html -> const [html]
@@ -197,6 +201,7 @@ toHtml cfg (errors, items) = C.concat $ htmlOf items (page cfg)
                 const (concatMap error errors)
         timeStr f = C.pack . formatTime defaultTimeLocale f
         host uri = maybe "" uriRegName (parseURI uri >>= uriAuthority)
+        items = maybe allItems (`take` allItems) (limit cfg)
 
 -- basically same UTCTime returning variant as in newer System.Directory
 getModificationTime file = do
