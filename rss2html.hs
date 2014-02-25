@@ -8,8 +8,9 @@ import Data.Digest.Pure.SHA
 import Data.Function
 import Data.List (sortBy)
 import Data.Maybe
-import Data.Time (UTCTime, utctDay, utctDayTime,
+import Data.Time (UTCTime, utctDay, utctDayTime, addUTCTime,
                   formatTime, parseTime, getCurrentTime)
+import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import qualified Data.Text as T
 import Data.Text.Encoding
 import Network.HTTP.Date
@@ -34,13 +35,13 @@ data ConfigItem =
     Feed C.ByteString [FeedOption] |
     Item [HtmlDef] |
     Page [HtmlDef] |
-    MaxAge Double
+    MaxAge Int
     deriving Read
 
 data Config = Config { feeds  :: [(String, [FeedOption])],
                        item   :: [HtmlDef],
                        page   :: [HtmlDef],
-                       maxAge :: Double }
+                       maxAge :: Int }
 
 -- all text fields are UTF-8 encoded
 data Entry = Entry { title    :: !C.ByteString,
@@ -185,7 +186,26 @@ toHtml cfg (errors, items) = C.concat $ htmlOf items (page cfg)
                 const (concatMap error errors)
         timeStr f = C.pack . formatTime defaultTimeLocale f
 
+getModificationTime file = do
+    stat <- getFileStatus file
+    return $ posixSecondsToUTCTime $ realToFrac $ modificationTime stat
+
+getCachedHtml cfgFile = do
+    cfg <- readConfig cfgFile
+    cache <- getCacheFile cfgFile
+    cacheStamp <- tryIO $ getModificationTime cache
+    useCached <- case cacheStamp of
+        Right cached -> do
+            cfgStamp <- getModificationTime cfgFile
+            currentTime <- getCurrentTime
+            return $ cfgStamp < cached &&
+                     currentTime < addUTCTime (fromIntegral $ maxAge cfg) cached
+        Left _ -> return False
+    if useCached
+        then C.readFile cache
+        else do html <- toHtml cfg `fmap` fetchFeeds (feeds cfg)
+                C.writeFile cache html
+                return html
 main = do
     args <- getArgs
-    cfg <- readConfig (head args)
-    fetchFeeds (feeds cfg) >>= C.putStrLn . toHtml cfg
+    getCachedHtml (head args) >>= C.putStrLn
