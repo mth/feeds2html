@@ -104,7 +104,8 @@ getEntry item = Entry {
         allowedTag (TagClose name)  = not (elem name disallow)
         allowedTag (TagComment _)   = False
         allowedTag _ = True
-        disallow = [T.pack "br", T.pack "p", T.pack "div"]
+        disallow = [T.pack "br", T.pack "p", T.pack "div",
+                    T.pack "h1", T.pack "h2", T.pack "h3", T.pack "h4"]
 
 runFork action = do
     result <- newEmptyMVar
