@@ -25,6 +25,7 @@ import System.Process
 import Text.Feed.Import
 import Text.Feed.Query
 import Text.HTML.SanitizeXSS
+import Text.HTML.TagSoup
 import Text.XML.Light
 
 data FeedOption = PreserveOrder | Adjust Double deriving (Read, Eq)
@@ -90,13 +91,20 @@ timeToScore t =
     realToFrac (utctDayTime t) / 60
 
 getEntry item = Entry {
-    title     = maybeStr (getItemTitle item),
+    title     = fst $ C.spanEnd isSpace $ C.dropWhile isSpace
+                    $ maybeStr (getItemTitle item),
     link      = maybeStr (getItemLink item),
     time      = time,
-    summary   = maybe C.empty (encodeUtf8 . sanitizeBalance . T.pack)
+    summary   = maybe C.empty (encodeUtf8 . sanitize . T.pack)
                       (getItemDescription item),
     score     = maybe 0.0 timeToScore time
 } where time = listToMaybe (mapMaybe ($ getItemDate item) dateFormats)
+        sanitize = filterTags (filter allowedTag) . sanitizeBalance
+        allowedTag (TagOpen name _) = not (elem name disallow)
+        allowedTag (TagClose name)  = not (elem name disallow)
+        allowedTag (TagComment _)   = False
+        allowedTag _ = True
+        disallow = [T.pack "br", T.pack "p", T.pack "div"]
 
 runFork action = do
     result <- newEmptyMVar
