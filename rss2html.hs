@@ -186,6 +186,7 @@ toHtml cfg (errors, items) = C.concat $ htmlOf items (page cfg)
                 const (concatMap error errors)
         timeStr f = C.pack . formatTime defaultTimeLocale f
 
+-- basically same UTCTime returning variant as in newer System.Directory
 getModificationTime file = do
     stat <- getFileStatus file
     return $ posixSecondsToUTCTime $ realToFrac $ modificationTime stat
