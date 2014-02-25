@@ -14,6 +14,7 @@ import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import qualified Data.Text as T
 import Data.Text.Encoding
 import Network.HTTP.Date
+import Network.URI
 import System.Environment
 import System.Exit
 import System.IO
@@ -28,7 +29,7 @@ import Text.XML.Light
 
 data FeedOption = PreserveOrder | Adjust Double deriving (Read, Eq)
 data HtmlDef = H C.ByteString | Items | Errors C.ByteString C.ByteString |
-               Title | Link | Time String | Summary
+               Title | Link | Host | Time String | Summary
     deriving Read
 
 data ConfigItem =
@@ -179,12 +180,14 @@ toHtml cfg (errors, items) = C.concat $ htmlOf items (page cfg)
             Items -> concatMap ((`htmlOf` item cfg) . (:[]))
             Title -> map title
             Link -> map link
+            Host -> map (C.pack . host . C.unpack . link)
             Time format -> mapMaybe (fmap (timeStr format) . time)
             Summary -> map summary
             Errors before after ->
                 let error e = [before, C.pack (escapeXml e), after] in
                 const (concatMap error errors)
         timeStr f = C.pack . formatTime defaultTimeLocale f
+        host uri = maybe "" uriRegName (parseURI uri >>= uriAuthority)
 
 -- basically same UTCTime returning variant as in newer System.Directory
 getModificationTime file = do
