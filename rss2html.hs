@@ -28,7 +28,9 @@ import Text.HTML.SanitizeXSS
 import Text.HTML.TagSoup
 import Text.XML.Light
 
-data FeedOption = PreserveOrder | Adjust Double deriving (Read, Eq)
+data FeedOption = PreserveOrder | Adjust Double | MaxItems Int
+    deriving (Read, Eq)
+
 data HtmlDef = H C.ByteString | Items | Errors C.ByteString C.ByteString |
                Title | Link | Host | Time String | Summary
     deriving Read
@@ -108,8 +110,7 @@ getEntry item = Entry {
         allowedTag (TagClose name)  = not (elem name disallow)
         allowedTag (TagComment _)   = False
         allowedTag _ = True
-        disallow = [T.pack "br", T.pack "p", T.pack "div", T.pack "img",
-                    T.pack "h1", T.pack "h2", T.pack "h3", T.pack "h4"]
+        disallow = map T.pack ["br", "p", "div", "img", "h1", "h2", "h3", "h4"]
 
 runFork action = do
     result <- newEmptyMVar
@@ -152,7 +153,7 @@ getCacheFile key = do
     tryIO $ createDirectory tmpdir 0o700
     return $ tmpdir ++ '/' : (showDigest $ sha224 $ CL.pack key)
 
-adjustScores maxScore options = foldr (.) orderf (map optf options)
+adjustScores maxScore = opt
   where order _ [] = []
         order best (item : newer) =
             let newer' = order (max best (score item)) newer in
@@ -162,10 +163,11 @@ adjustScores maxScore options = foldr (.) orderf (map optf options)
                                         h : _ -> score h
                                         [] -> max best maxScore in
                     item { score = (best + next_score) / 2 } : newer'
-        orderf = if elem PreserveOrder options
-                     then reverse . order (-1e9) . reverse else id
-        optf (Adjust by) = map (\e -> e { score = score e + by * 60 })
-        optf PreserveOrder = id
+        opt (PreserveOrder : r) l = opt r (reverse (order (-1e9) (reverse l)))
+        opt (MaxItems n : r) l = opt r (take n l)
+        opt (Adjust by : r) l =
+            map (\e -> e { score = score e + by * 60 }) (opt r l)
+        opt [] l = l
 
 toEntries curtime options =
     adjustScores (timeToScore curtime) options . map getEntry . feedItems
