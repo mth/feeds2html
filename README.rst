@@ -16,7 +16,7 @@
 SYNOPSIS
 ========
 
-feeds2html configuration
+feeds2html configuration-file
 
 DESCRIPTION
 ===========
