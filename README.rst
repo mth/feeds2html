@@ -35,9 +35,9 @@ directory to aid this usage.
 The idea is that for most of the RSS, you'll need a web browser anyway to read
 the linked articles, so the minimal user interface for RSS reader can be
 a simple web page. This utility provides a simple way to have such RSS reader,
-together with ability to merge many RSS feeds into single list, where newest
+together with ability to merge multiple RSS feeds into single list, where newest
 items are on the top. It can work with any browser, including the ones running
-in terminal (like lynx, allowing to eliminate most noise from the modern web).
+in terminal (like lynx, which eliminates most noise from the modern web).
 
 CONFIGURATION
 =============
