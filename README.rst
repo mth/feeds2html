@@ -29,8 +29,8 @@ into standard output.
 It is mostly intended to be used with web server by treating the
 configuration files as CGI scripts (where the feeds2html utility is
 used as an interpretator). The utility caches both the raw RSS/Atom
-XML files and the generated result in ``/tmp/.rss-cache-``\ **UID** file
-to aid this usage.
+XML files and the generated result in ``/tmp/.rss-cache-``\ **$UID**
+directory to aid this usage.
 
 CONFIGURATION
 =============
