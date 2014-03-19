@@ -28,7 +28,7 @@ import Text.HTML.SanitizeXSS
 import Text.HTML.TagSoup
 import Text.XML.Light
 
-data FeedOption = PreserveOrder | Adjust Double | MaxItems Int
+data FeedOption = PreserveOrder | Adjust Double | MaxItems Int | Skip Int
     deriving (Read, Eq)
 
 data HtmlDef = H C.ByteString | Items | Errors C.ByteString C.ByteString |
@@ -165,6 +165,7 @@ adjustScores maxScore = opt
                     item { score = (best + next_score) / 2 } : newer'
         opt (PreserveOrder : r) l = opt r (reverse (order (-1e9) (reverse l)))
         opt (MaxItems n : r) l = opt r (take n l)
+        opt (Skip n : r) l = opt r (drop n l)
         opt (Adjust by : r) l =
             map (\e -> e { score = score e + by * 60 }) (opt r l)
         opt [] l = l
