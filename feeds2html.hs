@@ -32,7 +32,7 @@ data FeedOption = PreserveOrder | Adjust Double | MaxItems Int | Skip Int
     deriving (Read, Eq)
 
 data HtmlDef = H C.ByteString | Items | Errors C.ByteString C.ByteString |
-               Title | Link | Host | Time String | Summary
+               Title | Link | Host | Time String | Summary | Nth
     deriving Read
 
 data ConfigItem =
@@ -54,7 +54,8 @@ data Entry = Entry { title    :: !C.ByteString,
                      link     :: !C.ByteString,
                      time     :: Maybe UTCTime,
                      summary  :: !C.ByteString,
-                     score    :: !Double } deriving Show
+                     score    :: !Double,
+                     nth      :: !Int } deriving Show
 
 tryIO :: IO a -> IO (Either E.IOException a)
 tryIO = E.try
@@ -103,7 +104,8 @@ getEntry item = Entry {
     time      = time,
     summary   = maybe C.empty (encodeUtf8 . sanitize . T.pack)
                       (getItemDescription item),
-    score     = maybe 0.0 timeToScore time
+    score     = maybe 0.0 timeToScore time,
+    nth       = 0
 } where time = listToMaybe (mapMaybe ($ getItemDate item) dateFormats)
         sanitize = filterTags (filter allowedTag) . sanitizeBalance
         allowedTag (TagOpen name _) = not (elem name disallow)
@@ -187,7 +189,8 @@ fetchFeeds feeds = do
     results <- mapM (runFork . fetchFeed) feeds >>= mapM readMVar
     let entries = sortBy (on (flip compare) score)
                          (concatMap snd results)
-    return (concatMap fst results, entries)
+        setNth entry nth = entry { nth = nth }
+    return (concatMap fst results, zipWith setNth entries [1..])
 
 toHtml cfg (errors, allItems) = C.concat $ htmlOf items (page cfg)
   where htmlOf = concatMap . flip process
@@ -199,6 +202,7 @@ toHtml cfg (errors, allItems) = C.concat $ htmlOf items (page cfg)
             Host -> map (C.pack . host . C.unpack . link)
             Time format -> mapMaybe (fmap (timeStr format) . time)
             Summary -> map summary
+            Nth -> map (C.pack . show . nth)
             Errors before after ->
                 let error e = [before, C.pack (escapeXml e), after] in
                 const (concatMap error errors)
