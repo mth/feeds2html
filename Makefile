@@ -1,3 +1,5 @@
+# aptitude install libghc-feed-dev libghc-xss-sanitize-dev libghc-http-date-dev libghc-sha-dev
+
 all: feeds2html feeds2html.1
 
 feeds2html: feeds2html.hs
