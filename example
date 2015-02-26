@@ -1,0 +1,28 @@
+#!/usr/local/bin/feeds2html
+
+Limit 80
+Feed "http://www.reddit.com/r/linux/hot/.xml"
+[MaxItems 16, PreserveOrder, Adjust -1.5]
+Feed "http://www.reddit.com/r/programming/hot/.xml" [MaxItems 15]
+Feed "http://www.reddit.com/r/haskell/hot/.xml" [MaxItems 16]
+Feed "http://www.reddit.com/r/worldnews/hot/.xml"
+[Skip 1, MaxItems 16, PreserveOrder, Adjust -0.5]
+Feed "http://www.reddit.com/r/programminglanguages/hot/.xml"
+[PreserveOrder, Adjust 12]
+Feed "http://feeds.arstechnica.com/arstechnica/index" []
+Feed "http://www.theregister.co.uk/headlines.atom" []
+Feed "http://rss.slashdot.org/Slashdot/slashdot" []
+Feed "http://www.osnews.com/files/recent.xml" [Adjust 12]
+Feed "http://lambda-the-ultimate.org/rss.xml" [Adjust 24]
+
+Item [H "<b>", Nth, H ".</b> <a class=title href=\"", Link, H "\">",
+      Title, H "</a> (", Host, Time ") - %e.%m %H:%M<br>",
+      Summary, H "<hr>\n"]
+
+Page [H "Content-Type: text/html; charset=UTF-8\r\n\r\n",
+      H "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\">",
+      H "<html><head><title>RSS</title><style type=\"text/css\">",
+      H "body {font-family: sans-serif; background: #dde9f0; font-size: 11pt}",
+      H ".title {color: blue; font-weight: bold; font-size: 12pt}",
+      H "</style></head><body>", Items,
+      Errors "<pre>" "</pre>", H "</body></html>"]
