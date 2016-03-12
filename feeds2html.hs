@@ -38,8 +38,10 @@ import System.Locale (defaultTimeLocale, iso8601DateFormat, rfc822DateFormat)
 import System.Posix (createDirectory, getRealUserID)
 import System.Posix.Files
 import System.Process
+import qualified Text.Atom.Feed as Atom
 import Text.Feed.Import
 import Text.Feed.Query
+import qualified Text.Feed.Types as Feed
 import Text.HTML.SanitizeXSS
 import Text.HTML.TagSoup
 import Text.XML.Light
@@ -113,22 +115,48 @@ timeToScore t =
     fromIntegral (fromEnum (utctDay t) - 50000) * 1440 +
     realToFrac (utctDayTime t) / 60
 
-getEntry item = Entry {
-    title     = fst $ C.spanEnd isSpace $ C.dropWhile isSpace
-                    $ maybeStr (getItemTitle item),
-    link      = maybeStr (getItemLink item),
-    time      = time,
-    summary   = maybe C.empty (encodeUtf8 . sanitize . T.pack)
-                      (getItemDescription item),
-    score     = maybe 0.0 timeToScore time,
-    nth       = 0
-} where time = listToMaybe (mapMaybe ($ getItemDate item) dateFormats)
+tryLink item =
+    case getItemLink item of
+        Just s | s /= "" -> Just s
+        _ -> extract item
+  where extract (Feed.AtomItem atom) =
+            let links = Atom.entryLinks atom
+                strs = map atomLink links ++ map Atom.linkHref links in
+            listToMaybe $  filter (/= "") strs
+        extract _ = Nothing
+        atomLink link | Atom.linkType link == Nothing = Atom.linkHref link
+        atomLink _ = ""
+
+trySummary item =
+    case getItemDescription item of
+        Just s | s /= "" -> html s
+        _ -> extract item
+  where extract (Feed.AtomItem atom) =
+            case Atom.entryContent atom of
+                Just (Atom.TextContent c) -> maybeStr (Just c)
+                Just (Atom.HTMLContent c) -> html c
+                Just (Atom.XHTMLContent c) -> html $ showElement c
+                Just (Atom.MixedContent str c) ->
+                    C.append (maybeStr str) (html $ concatMap showContent c)
+                _ -> C.empty
+        extract _ = C.empty
+        html = encodeUtf8 . sanitize . T.pack
         sanitize = filterTags (filter allowedTag) . sanitizeBalance
         allowedTag (TagOpen name _) = not (elem name disallow)
         allowedTag (TagClose name)  = not (elem name disallow)
         allowedTag (TagComment _)   = False
         allowedTag _ = True
         disallow = map T.pack ["br", "p", "div", "img", "h1", "h2", "h3", "h4"]
+
+getEntry item = Entry {
+    title     = fst $ C.spanEnd isSpace $ C.dropWhile isSpace
+                    $ maybeStr (getItemTitle item),
+    link      = maybeStr $ tryLink item,
+    time      = time,
+    summary   = trySummary item,
+    score     = maybe 0.0 timeToScore time,
+    nth       = 0
+} where time = listToMaybe (mapMaybe ($ getItemDate item) dateFormats)
 
 runFork action = do
     result <- newEmptyMVar
